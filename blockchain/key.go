@@ -21,7 +21,7 @@ type Key struct {
 	Token      []byte
 }
 
-// GenerateKey generates key
+// GenerateKey generates SecretKey, privatekey, publickey
 func GenerateKey(keyPath string) (*Key, error) {
 	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
 		var key Key
