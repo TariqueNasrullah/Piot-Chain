@@ -1,10 +1,15 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/gob"
+	"io"
 	"math/big"
 )
 
@@ -72,7 +77,7 @@ func (block *Block) HashTransactions() []byte {
 	return tree.RootNode.Data
 }
 
-/ Encrypt encrypts all transaction
+// Encrypt encrypts all transaction
 func (block *Block) Encrypt(passphrase []byte) {
 	cipherBlock, _ := aes.NewCipher([]byte(Hash(passphrase)))
 	gcm, err := cipher.NewGCM(cipherBlock)
@@ -107,4 +112,28 @@ func (block *Block) Decrypt(passphrase []byte) {
 			panic(err)
 		}
 	}
+}
+
+// Serialize serialiszes block
+func (block *Block) Serialize() ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+
+	err := encoder.Encode(block)
+	if err != nil {
+		return []byte{}, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// Deserialize deserializes block
+func Deserialize(data []byte) (*Block, error) {
+	var block Block
+
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&block)
+	if err != nil {
+		return &block, err
+	}
+	return &block, nil
 }
