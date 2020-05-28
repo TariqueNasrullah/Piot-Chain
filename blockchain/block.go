@@ -61,3 +61,13 @@ func (block *Block) VerifySignature() bool {
 	validity := ecdsa.Verify(&rawPublicKey, hash[:], &r, &s)
 	return validity
 }
+
+// HashTransactions hashes all transaction using merkle tree
+func (block *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	for _, tx := range block.Transactions {
+		txHashes = append(txHashes, tx.Serialize())
+	}
+	tree := NewMerkleTree(txHashes)
+	return tree.RootNode.Data
+}
