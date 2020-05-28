@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -54,4 +55,35 @@ func TestKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error Not expected! Error: %v\n", err)
 	}
+}
+
+func TestProof(t *testing.T) {
+	trans := Transaction{
+		Data: []byte("Hello World"),
+	}
+
+	block := Block{
+		Transactions: []*Transaction{&trans},
+	}
+	pow := NewProof(&block)
+	nonce, hash := pow.Run()
+	block.Nonce = nonce
+	block.Hash = hash
+
+	valid := pow.Validate()
+
+	if !valid {
+		t.FailNow()
+	}
+	fmt.Printf("POW Validity: %v Expected: true\n", valid)
+
+	nonce, hash = pow.Run()
+	block.Nonce = nonce - 1
+	block.Hash = hash
+	valid = pow.Validate()
+
+	if valid {
+		t.FailNow()
+	}
+	fmt.Printf("POW Validity: %v Expected: false\n", valid)
 }
