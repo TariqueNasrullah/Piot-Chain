@@ -71,3 +71,40 @@ func (block *Block) HashTransactions() []byte {
 	tree := NewMerkleTree(txHashes)
 	return tree.RootNode.Data
 }
+
+/ Encrypt encrypts all transaction
+func (block *Block) Encrypt(passphrase []byte) {
+	cipherBlock, _ := aes.NewCipher([]byte(Hash(passphrase)))
+	gcm, err := cipher.NewGCM(cipherBlock)
+	if err != nil {
+		panic(err.Error())
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
+	}
+	for _, tx := range block.Transactions {
+		tx.Data = gcm.Seal(nonce, nonce, tx.Data, nil)
+	}
+}
+
+// Decrypt decrypts
+func (block *Block) Decrypt(passphrase []byte) {
+	key := []byte(Hash(passphrase))
+	cipherBlock, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+	gcm, err := cipher.NewGCM(cipherBlock)
+	if err != nil {
+		panic(err.Error())
+	}
+	nonceSize := gcm.NonceSize()
+
+	for _, tx := range block.Transactions {
+		_, err := gcm.Open(nil, tx.Data[:nonceSize], tx.Data[nonceSize:], nil)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
