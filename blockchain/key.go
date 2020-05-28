@@ -70,7 +70,7 @@ func LoadKey(keyPath string) (*Key, error) {
 // SaveFile saves key into file
 func (key *Key) SaveFile(keyPath string) error {
 	var buffer bytes.Buffer
-	gob.Register(elliptic.P256)
+	gob.Register(elliptic.P256())
 
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(key)
