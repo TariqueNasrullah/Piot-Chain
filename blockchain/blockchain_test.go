@@ -2,6 +2,9 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"testing"
@@ -86,4 +89,53 @@ func TestProof(t *testing.T) {
 		t.FailNow()
 	}
 	fmt.Printf("POW Validity: %v Expected: false\n", valid)
+}
+
+func generateToken(username, password string) ([]byte, error) {
+	hash := []byte(username + password)
+
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	r, s, err := ecdsa.Sign(rand.Reader, key, hash[:])
+	if err != nil {
+		return []byte{}, err
+	}
+
+	signature := append(r.Bytes(), s.Bytes()...)
+	return signature, nil
+}
+
+func TestAddress(t *testing.T) {
+	token, err := generateToken("admin", "pass")
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+	key, err := GenerateKey("key.data")
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+
+	key.Token = token
+
+	trans := Transaction{
+		Data: []byte("Hello Transaction"),
+	}
+	block := Block{
+		Transactions: []*Transaction{&trans},
+		Token:        key.Token,
+		PublicKey:    key.PublicKey,
+	}
+
+	addr0, err := block.Address()
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+
+	addr1, err := block.Address()
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+
+	if bytes.Compare(addr0, addr1) != 0 {
+		t.Fatal("Two address should be same. Failed")
+	}
 }

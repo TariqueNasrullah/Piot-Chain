@@ -15,6 +15,11 @@ import (
 	"strings"
 )
 
+const (
+	checksumLength = 4
+	version        = byte(0x00)
+)
+
 // Block strcut
 type Block struct {
 	PrevHash     []byte
@@ -138,6 +143,21 @@ func Deserialize(data []byte) (*Block, error) {
 		return &block, err
 	}
 	return &block, nil
+}
+
+// Address function makes address from block token
+func (block *Block) Address() ([]byte, error) {
+	pubHash, err := PublicKeyTokenHash(block.PublicKey, block.Token)
+	if err != nil {
+		return []byte{}, err
+	}
+	versionedHash := append([]byte{version}, pubHash...)
+	checksum := Checksum(versionedHash)
+
+	fullHash := append(versionedHash, checksum...)
+	address := Base58Encode(fullHash)
+
+	return address, nil
 }
 
 // String prints the block
