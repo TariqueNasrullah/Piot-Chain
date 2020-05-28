@@ -80,6 +80,7 @@ func (key *Key) SaveFile(keyPath string) error {
 	if err != nil {
 		return err
 	}
+	return nil
 }
 
 func (key *Key) String() string {
