@@ -9,8 +9,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"math/big"
+	"strings"
 )
 
 // Block strcut
@@ -136,4 +138,19 @@ func Deserialize(data []byte) (*Block, error) {
 		return &block, err
 	}
 	return &block, nil
+}
+
+// String prints the block
+func (block Block) String() string {
+	var values []string
+
+	values = append(values, fmt.Sprintf("----Block: "))
+	values = append(values, fmt.Sprintf(" PrevHash  : %x", block.PrevHash))
+	values = append(values, fmt.Sprintf(" Hash      : %x", block.Hash))
+	values = append(values, fmt.Sprintf(" Nounce    : %d", block.Nonce))
+	values = append(values, fmt.Sprintf(" Signature : %x", block.Signature))
+	values = append(values, fmt.Sprintf(" Token     : %x", block.Token))
+	values = append(values, fmt.Sprintf(" PublicKey : %x", block.PublicKey))
+
+	return strings.Join(values, "\n")
 }
