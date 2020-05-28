@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 )
@@ -69,17 +68,17 @@ func LoadKey(keyPath string) (*Key, error) {
 }
 
 // SaveFile saves key into file
-func (key *Key) SaveFile(keyPath string) {
+func (key *Key) SaveFile(keyPath string) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(key)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	err = ioutil.WriteFile(keyPath, buffer.Bytes(), 0644)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 }
 
