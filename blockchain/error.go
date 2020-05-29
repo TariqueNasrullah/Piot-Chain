@@ -11,6 +11,8 @@ const (
 	ErrorInvalidProofOfWork = 402
 	// ErrorPreviousHashNotFound status code
 	ErrorPreviousHashNotFound = 403
+	// ErrorGenesisExists status code
+	ErrorGenesisExists = 404
 	// ErrorUnknown status code
 	ErrorUnknown = 420
 )

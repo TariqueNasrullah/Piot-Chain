@@ -146,8 +146,8 @@ func Deserialize(data []byte) (*Block, error) {
 }
 
 // Address function makes address from block token
-func Address(pubKey, token []byte) ([]byte, error) {
-	pubHash, err := PublicKeyTokenHash(pubKey, token)
+func Address(token []byte) ([]byte, error) {
+	pubHash, err := PublicKeyTokenHash(token)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -158,6 +158,14 @@ func Address(pubKey, token []byte) ([]byte, error) {
 	address := Base58Encode(fullHash)
 
 	return address, nil
+}
+
+// IsGenesis returns true if block is genesis, false otherwise
+func (block *Block) IsGenesis() bool {
+	if len(block.PrevHash) == 0 {
+		return true
+	}
+	return false
 }
 
 // String prints the block
