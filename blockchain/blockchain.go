@@ -96,7 +96,3 @@ UpdateDB:
 	}
 	return nil
 }
-
-func test() {
-	fmt.Println("testing")
-}
