@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -125,17 +126,93 @@ func TestAddress(t *testing.T) {
 		PublicKey:    key.PublicKey,
 	}
 
-	addr0, err := Address(block.PublicKey, block.Token)
+	addr0, err := Address(block.Token)
 	if err != nil {
 		t.Fatalf("Error Not expected! Error: %v\n", err)
 	}
 
-	addr1, err := Address(block.PublicKey, block.Token)
+	addr1, err := Address(block.Token)
 	if err != nil {
 		t.Fatalf("Error Not expected! Error: %v\n", err)
 	}
 
 	if bytes.Compare(addr0, addr1) != 0 {
 		t.Fatal("Two address should be same. Failed")
+	}
+}
+func ensureDir(fileName string) error {
+	dirName := filepath.Dir(fileName)
+	if _, serr := os.Stat(dirName); serr != nil {
+		merr := os.MkdirAll(dirName, os.ModePerm)
+		if merr != nil {
+			return merr
+		}
+	}
+	return nil
+}
+
+func TestAddBlock(t *testing.T) {
+	err := ensureDir("tmp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		os.RemoveAll("tmp")
+	}()
+
+	token, err := generateToken("admin", "pass")
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+	key, err := GenerateKey("key.data")
+	if err != nil {
+		t.Fatalf("Error Not expected! Error: %v\n", err)
+	}
+
+	key.Token = token
+
+	trans := Transaction{
+		Data: []byte("Hello Transaction"),
+	}
+	genesisTransaction := Transaction{
+		Data: []byte("Genesis Transaction"),
+	}
+
+	genesisBlock := Block{
+		Transactions: []*Transaction{&genesisTransaction},
+		Token:        key.Token,
+	}
+	pow := NewProof(&genesisBlock)
+	nonce, hash := pow.Run()
+	genesisBlock.Nonce = nonce
+	genesisBlock.Hash = hash
+
+	block := Block{
+		Transactions: []*Transaction{&trans},
+		Token:        key.Token,
+		PublicKey:    key.PublicKey,
+		PrevHash:     hash,
+	}
+	block.Sign(key.PrivateKey)
+	pow = NewProof(&block)
+	nonce, hash = pow.Run()
+	block.Nonce = nonce
+	block.Hash = hash
+
+	chain, err := InitBlockChain("tmp")
+	if err != nil {
+		t.Fatal("Init chain Error is unexpected ", err)
+	}
+	defer chain.Database.Close()
+
+	err = chain.AddGenesis(&genesisBlock)
+	if err != nil {
+		t.Fatalf("Error is unexpected: %v\n", err.Error())
+	}
+
+	err = chain.AddBlock(&block)
+
+	if err != nil {
+		t.Fatalf("Error is unexpected: %v\n", err.Error())
 	}
 }

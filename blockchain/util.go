@@ -32,8 +32,8 @@ func ToHex(num int64) []byte {
 }
 
 // PublicKeyTokenHash hashes PublicKey + Token
-func PublicKeyTokenHash(pubKey, token []byte) ([]byte, error) {
-	pubHash := sha256.Sum256(append(pubKey, token...))
+func PublicKeyTokenHash(token []byte) ([]byte, error) {
+	pubHash := sha256.Sum256(token)
 
 	hasher := ripemd160.New()
 	_, err := hasher.Write(pubHash[:])
