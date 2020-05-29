@@ -125,12 +125,12 @@ func TestAddress(t *testing.T) {
 		PublicKey:    key.PublicKey,
 	}
 
-	addr0, err := Address(block.PublicKey, block.Token)
+	addr0, err := block.Address()
 	if err != nil {
 		t.Fatalf("Error Not expected! Error: %v\n", err)
 	}
 
-	addr1, err := Address(block.PublicKey, block.Token)
+	addr1, err := block.Address()
 	if err != nil {
 		t.Fatalf("Error Not expected! Error: %v\n", err)
 	}
