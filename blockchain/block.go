@@ -146,8 +146,8 @@ func Deserialize(data []byte) (*Block, error) {
 }
 
 // Address function makes address from block token
-func (block *Block) Address() ([]byte, error) {
-	pubHash, err := PublicKeyTokenHash(block.PublicKey, block.Token)
+func Address(pubKey, token []byte) ([]byte, error) {
+	pubHash, err := PublicKeyTokenHash(pubKey, token)
 	if err != nil {
 		return []byte{}, err
 	}

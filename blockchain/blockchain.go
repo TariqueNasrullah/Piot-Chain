@@ -66,7 +66,7 @@ UpdateDB:
 			return err
 		}
 
-		address, err := block.Address()
+		address, err := Address(block.PublicKey, block.Token)
 		if err != nil {
 			return err
 		}
