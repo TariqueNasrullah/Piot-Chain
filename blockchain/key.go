@@ -21,27 +21,29 @@ type Key struct {
 	Token      []byte
 }
 
+var (
+	// KEYPATH is the path of key file
+	KEYPATH = "tmp/key/key.data"
+)
+
 // GenerateKey generates SecretKey, privatekey, publickey
 func GenerateKey(keyPath string) (*Key, error) {
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-		var key Key
+	var key Key
 
-		// Assign SecretKey
-		var randomKey [32]byte
-		rand.Read(randomKey[:])
-		key.SecretKey = randomKey[:]
+	// Assign SecretKey
+	var randomKey [32]byte
+	rand.Read(randomKey[:])
+	key.SecretKey = randomKey[:]
 
-		// Gnerate ecdsa priv pub key
-		privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			return &key, err
-		}
-		key.PrivateKey = privKey
-		key.PublicKey = append(privKey.PublicKey.X.Bytes(), privKey.PublicKey.Y.Bytes()...)
-
-		return &key, nil
+	// Gnerate ecdsa priv pub key
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return &key, err
 	}
-	return &Key{}, errors.New("Key Exists")
+	key.PrivateKey = privKey
+	key.PublicKey = append(privKey.PublicKey.X.Bytes(), privKey.PublicKey.Y.Bytes()...)
+
+	return &key, nil
 }
 
 // LoadKey loads key from file
