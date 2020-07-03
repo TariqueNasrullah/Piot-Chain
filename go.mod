@@ -8,6 +8,7 @@ require (
 	github.com/dgraph-io/badger v1.6.1
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/golang/protobuf v1.3.3
+	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
 	github.com/mr-tron/base58 v1.1.3
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37

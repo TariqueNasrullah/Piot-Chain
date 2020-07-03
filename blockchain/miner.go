@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/TariqueNasrullah/iotchain/analysis"
 	"github.com/dgraph-io/badger"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -203,6 +205,9 @@ func (srv *Server) Height(ctx context.Context, in *HeightRequest) (*HeightRespon
 
 // Mine mines
 func (srv *Server) Mine(ctx context.Context, in *MineRequest) (*MineResponse, error) {
+	// Starting time
+	startTime := time.Now()
+
 	block, err := Deserialize(in.Block)
 	if err != nil {
 		return nil, err
@@ -213,6 +218,9 @@ func (srv *Server) Mine(ctx context.Context, in *MineRequest) (*MineResponse, er
 	block.Nonce = nonce
 	block.Hash = hash
 
+	// Block gen ending time
+	endTime := time.Now()
+	go analysis.SaveBlockGenTime(startTime, endTime, block.Hash)
 	serializedBlock, err := block.Serialize()
 	if err != nil {
 		return nil, err

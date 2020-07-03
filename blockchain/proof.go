@@ -9,7 +9,7 @@ import (
 
 var (
 	// Difficulty is POW difficulty
-	Difficulty = 12
+	Difficulty = 10
 )
 
 // ProofOfWork struct
