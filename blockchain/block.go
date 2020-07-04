@@ -168,17 +168,41 @@ func (block *Block) IsGenesis() bool {
 	return false
 }
 
+// NewGenesisBlock crreates and returns a new genesis block
+func NewGenesisBlock(token []byte, privateKey *ecdsa.PrivateKey) (*Block, error) {
+	trans := Transaction{
+		Data: []byte("Genesis Transaction"),
+	}
+	block := Block{
+		Transactions: []*Transaction{&trans},
+		Token:        token,
+	}
+	err := block.Sign(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	pow := NewProof(&block)
+	nonce, hash := pow.Run()
+	block.Nonce = nonce
+	block.Hash = hash
+
+	return &block, nil
+}
+
 // String prints the block
 func (block Block) String() string {
 	var values []string
 
-	values = append(values, fmt.Sprintf("----Block: "))
-	values = append(values, fmt.Sprintf(" PrevHash  : %x", block.PrevHash))
-	values = append(values, fmt.Sprintf(" Hash      : %x", block.Hash))
+	values = append(values, fmt.Sprintf("\n----Block: "))
+	values = append(values, fmt.Sprintf(" PrevHash  : %X", block.PrevHash))
+	values = append(values, fmt.Sprintf(" Hash      : %X", block.Hash))
 	values = append(values, fmt.Sprintf(" Nounce    : %d", block.Nonce))
-	values = append(values, fmt.Sprintf(" Signature : %x", block.Signature))
-	values = append(values, fmt.Sprintf(" Token     : %x", block.Token))
-	values = append(values, fmt.Sprintf(" PublicKey : %x", block.PublicKey))
+	values = append(values, fmt.Sprintf(" Signature : %X", block.Signature))
+	values = append(values, fmt.Sprintf(" Token     : %X", block.Token))
+	values = append(values, fmt.Sprintf(" PublicKey : %X", block.PublicKey))
 
+	for idx := range block.Transactions {
+		values = append(values, fmt.Sprintf("   ├──Transaction  : %s", string(block.Transactions[idx].Data)))
+	}
 	return strings.Join(values, "\n")
 }

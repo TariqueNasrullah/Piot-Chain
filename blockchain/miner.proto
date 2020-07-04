@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package blockchain;
+
+service Miner {
+    rpc SendAddress (SendAddressRequest) returns (SendAddressResponse);
+    rpc GetAddress (GetAddressRequest) returns (stream GetAddressResponse);
+    rpc FullHeight (FullHeightRequest) returns (FullHeightResponse);
+    rpc Height (HeightRequest) returns (HeightResponse);
+    rpc GetFullChain (GetFullChainRequest) returns (stream GetFullChainResponse);
+    rpc PropagateBlock (PropagateBlockRequest) returns (PropagateBlockResponse);
+    rpc Token (TokenRequest) returns (TokenResponse);
+    rpc Ping (PingRequest) returns (PingResponse);
+    rpc GetChain (GetChainRequest) returns (stream GetChainResponse);
+    rpc Mine (MineRequest) returns (MineResponse);
+    rpc Test (TestRequest) returns (TestResponse);
+}
+
+message SendAddressRequest {
+    string addr = 1;
+}
+
+message SendAddressResponse {
+    string responseText = 1;
+    uint64 statusCode = 2;
+
+}
+
+message GetAddressRequest {}
+message GetAddressResponse {
+    string address = 1;
+}
+
+message FullHeightRequest{
+    int64 height = 1;
+}
+message FullHeightResponse{
+    int64 height = 1;
+}
+
+message GetFullChainRequest{}
+message GetFullChainResponse{
+    bytes key = 1;
+    bytes value = 2;
+}
+
+message PropagateBlockRequest{
+    bytes block = 1;
+}
+message PropagateBlockResponse {
+    bool ok = 1;
+}
+
+message TokenRequest {
+    string username = 1;
+    string password = 2;
+}
+message TokenResponse {
+    bytes token = 1;
+}
+
+message PingRequest{}
+message PingResponse{}
+
+message HeightRequest{
+    bytes token = 1;
+}
+message HeightResponse{
+    int64 height = 1;
+}
+
+message GetChainRequest {
+    bytes token = 1;
+}
+message GetChainResponse {
+    bytes block = 1;
+}
+
+message MineRequest {
+    bytes block = 1;
+}
+message MineResponse {
+    bytes block = 1;
+}
+
+message TestRequest {
+    bytes block = 1;
+}
+message TestResponse {
+    bytes block = 1;
+}
