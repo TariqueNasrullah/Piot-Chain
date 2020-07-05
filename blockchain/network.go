@@ -214,9 +214,17 @@ func (network *Network) CreateBlock(srvAddr string, token []byte, transData []st
 		PrevHash:     lastHash,
 		PublicKey:    key.PublicKey,
 	}
-	err = block.Sign(key.PrivateKey)
-	if err != nil {
-		return err
+	for {
+		logrus.Infoln("Sigining Block")
+		err = block.Sign(key.PrivateKey)
+		if err != nil {
+			return err
+		}
+		if ok := block.VerifySignature(); ok {
+			logrus.Warnln("Sigining verification failed, retrying...")
+			break
+		}
+		logrus.Infoln("Signing Success..")
 	}
 
 	serializedBlock, err := block.Serialize()
