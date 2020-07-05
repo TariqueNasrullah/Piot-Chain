@@ -126,6 +126,7 @@ func (chain *BlockChain) AddBlock(block *Block) error {
 		}
 		break
 	}
+	logrus.Infoln("Added block to local chain")
 	return nil
 }
 
