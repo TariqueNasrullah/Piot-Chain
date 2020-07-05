@@ -80,6 +80,7 @@ func (cli *CommandLine) Run() {
 	clientCmdBlock := clientCmd.Bool("b", false, "Generate block")
 	var transactions transData
 	clientCmd.Var(&transactions, "t", "Comma seperated list of transactions")
+	clientCmdBlockCount := clientCmd.Int("count", 1, "Number of blocks")
 
 	testCmd := flag.NewFlagSet("test", flag.ExitOnError)
 	testCmdAddr := testCmd.String("f", "", "address")
@@ -286,6 +287,9 @@ func (cli *CommandLine) Run() {
 			}
 			token = tkn
 		}
+		if *clientCmdBlockCount <= 0 {
+			logrus.Fatal("Block count must be a positive number")
+		}
 
 		if *clientCmdSync == true {
 			chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
@@ -313,11 +317,14 @@ func (cli *CommandLine) Run() {
 			blockchain.Chain = chain
 
 			network := blockchain.Network{}
-			err = network.CreateBlock(*clientCmdMinerAddr, token, transactions)
-			if err != nil {
-				logrus.Fatal(err)
+			for i := 1; i <= *clientCmdBlockCount; i++ {
+				logrus.Infof("Generting Block: %v\n", i)
+				err = network.CreateBlock(*clientCmdMinerAddr, token, transactions)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				logrus.Info("Block Mined Successfully")
 			}
-			logrus.Info("Block Mined Successfully")
 		}
 	}
 	if testCmd.Parsed() {
