@@ -49,12 +49,15 @@ func (srv *Server) Test(ctx context.Context, in *TestRequest) (*TestResponse, er
 
 // SendAddress implementation
 func (srv *Server) SendAddress(ctx context.Context, in *SendAddressRequest) (*SendAddressResponse, error) {
-	KnownNodes[in.Addr] = struct{}{}
 
-	if _, ok := ConnectedNodes[in.Addr]; !ok {
-		network := Network{}
-		go network.SendAddress(in.Addr)
+	network := Network{}
+	conn, err := network.Connect(in.Addr)
+	if err != nil {
+		return &SendAddressResponse{ResponseText: "Cant't Connect with " + in.Addr, StatusCode: 401}, nil
 	}
+
+	ConnectedNodes[conn.Target()] = conn
+	logrus.Infof("Connected to %v\n", conn.Target())
 	return &SendAddressResponse{ResponseText: "OK", StatusCode: 200}, nil
 }
 

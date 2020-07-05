@@ -19,7 +19,7 @@ var (
 	// KnownNodes holds known nodes address
 	KnownNodes = make(map[string]struct{})
 	// ConnectedNodes holds the address of connected nodes
-	ConnectedNodes = make(map[string]struct{})
+	ConnectedNodes = make(map[string]*grpc.ClientConn)
 	// Protocol defination
 	Protocol = "tcp"
 
@@ -55,13 +55,19 @@ func (network *Network) Serve(addr string) {
 	}
 }
 
+// Connect establish a connection to a grpc server and returns the connection and error
+func (network *Network) Connect(srvAddr string) (*grpc.ClientConn, error) {
+	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
+
+	return conn, err
+}
+
 // SendAddress sends addr to a server
 func (network *Network) SendAddress(srvAddr string) {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
+	conn, err := network.Connect(srvAddr)
 	if err != nil {
 		return
 	}
-	defer conn.Close()
 
 	clinet := NewMinerClient(conn)
 
@@ -70,8 +76,8 @@ func (network *Network) SendAddress(srvAddr string) {
 		return
 	}
 	if response.StatusCode == 200 {
-		ConnectedNodes[srvAddr] = struct{}{}
-		logrus.Infof("Connected to %v\n", srvAddr)
+		ConnectedNodes[conn.Target()] = conn
+		logrus.Infof("Connected to %v\n", conn.Target())
 	}
 	return
 }
@@ -80,14 +86,7 @@ func (network *Network) SendAddress(srvAddr string) {
 func (network *Network) GetAddress(srvAddr string) []string {
 	var addrList []string
 
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		log.Printf("Can't Establis connection : %v\n", err)
-		return addrList
-	}
-	defer conn.Close()
-
-	client := NewMinerClient(conn)
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 
 	stream, err := client.GetAddress(context.Background(), &GetAddressRequest{})
 	if err != nil {
@@ -126,32 +125,42 @@ func (network *Network) DiscoverAndConnect() {
 	}
 }
 
-func (network *Network) discoverNodes(srvAddr string) map[string]struct{} {
-	queue := []string{srvAddr}
-	discoverdAddrList := make(map[string]struct{})
+func (network *Network) discoverNodes(srvAddr string) {
+	if !contains(ConnectedNodes, srvAddr) {
+		conn, err := network.Connect(srvAddr)
+		if err == nil {
+			ConnectedNodes[conn.Target()] = conn
+		}
+	}
+	queue := []string{}
+	for srvAddr := range ConnectedNodes {
+		queue = append(queue, srvAddr)
+	}
+
 	for len(queue) != 0 {
 		addr := queue[0]
 		queue = queue[1:]
-		if ok := network.Ping(addr); !ok {
-			continue
-		}
-		discoverdAddrList[addr] = struct{}{}
+
 		addrList := network.GetAddress(addr)
 
 		for _, newAddresses := range addrList {
-			if !contains(discoverdAddrList, newAddresses) {
+			if !contains(ConnectedNodes, newAddresses) {
 				queue = append(queue, newAddresses)
+				conn, err := network.Connect(newAddresses)
+				if err != nil {
+					continue
+				}
+				ConnectedNodes[conn.Target()] = conn
 			}
 		}
 	}
-	return discoverdAddrList
 }
 
 // DiscoverAndDownload discovres the network and download best chain to local db
 func (network *Network) DiscoverAndDownload(srvAddr string, token []byte) error {
-	discoverdAddrList := network.discoverNodes(srvAddr)
+	network.discoverNodes(srvAddr)
 	fmt.Println(" --- Discovered nodes")
-	for key := range discoverdAddrList {
+	for key := range ConnectedNodes {
 		fmt.Println(key)
 	}
 
@@ -159,7 +168,7 @@ func (network *Network) DiscoverAndDownload(srvAddr string, token []byte) error 
 	if err != nil {
 		return err
 	}
-	bestHeightNode := network.FindBestHeightNodeByToken(token, myHeight, discoverdAddrList)
+	bestHeightNode := network.FindBestHeightNodeByToken(token, myHeight)
 
 	if bestHeightNode == "" {
 		logrus.Info("No best node found to sync chain")
@@ -177,12 +186,12 @@ func (network *Network) DiscoverAndDownload(srvAddr string, token []byte) error 
 
 // CreateBlock creates block and send to a miner
 func (network *Network) CreateBlock(srvAddr string, token []byte, transData []string) error {
-	discoveredNodeList := network.discoverNodes(srvAddr)
-	if len(discoveredNodeList) == 0 {
+	network.discoverNodes(srvAddr)
+	if len(ConnectedNodes) == 0 {
 		return errors.New("Unable to discover at lest one miner node")
 	}
 	discoveredNodeListString := []string{}
-	for addr := range discoveredNodeList {
+	for addr := range ConnectedNodes {
 		discoveredNodeListString = append(discoveredNodeListString, addr)
 	}
 
@@ -237,14 +246,7 @@ func (network *Network) CreateBlock(srvAddr string, token []byte, transData []st
 
 // Mine send mine request to a miner
 func (network *Network) Mine(srvAddr string, block []byte) error {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		log.Printf("Can't Establis connection : %v\n", err)
-		return err
-	}
-	defer conn.Close()
-
-	client := NewMinerClient(conn)
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 
 	response, err := client.Mine(context.Background(), &MineRequest{Block: block})
 	if err != nil {
@@ -274,14 +276,8 @@ func (network *Network) Mine(srvAddr string, block []byte) error {
 
 // GetFullHeight gets full height from a node
 func GetFullHeight(srvAddr string, myHeight int64) (int64, error) {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		log.Printf("Can't Establis connection : %v\n", err)
-		return int64(0), err
-	}
-	defer conn.Close()
 
-	client := NewMinerClient(conn)
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 
 	response, err := client.FullHeight(context.Background(), &FullHeightRequest{Height: myHeight})
 	if err != nil {
@@ -297,14 +293,14 @@ func (network *Network) FindBestHeightNode() string {
 	myHeight := Chain.FullHeight()
 	max := myHeight
 
-	for key := range ConnectedNodes {
-		height, err := GetFullHeight(key, myHeight)
+	for srvAddr := range ConnectedNodes {
+		height, err := GetFullHeight(srvAddr, myHeight)
 		if err != nil {
 			logrus.Warnf("Error: %v", err)
 		} else {
 			if height > max {
 				max = height
-				addr = key
+				addr = srvAddr
 			}
 		}
 	}
@@ -312,11 +308,11 @@ func (network *Network) FindBestHeightNode() string {
 }
 
 // FindBestHeightNodeByToken finds best height node by token
-func (network *Network) FindBestHeightNodeByToken(token []byte, myHeight int64, discoverdAddrList map[string]struct{}) string {
+func (network *Network) FindBestHeightNodeByToken(token []byte, myHeight int64) string {
 	var addr string
 	max := myHeight
 
-	for srvAddr := range discoverdAddrList {
+	for srvAddr := range ConnectedNodes {
 		height, err := Getheight(srvAddr, token)
 		if err != nil {
 			logrus.Warnf("Error: %v", err)
@@ -332,13 +328,8 @@ func (network *Network) FindBestHeightNodeByToken(token []byte, myHeight int64, 
 
 // Getheight get heights of a chain
 func Getheight(srvAddr string, token []byte) (int64, error) {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Close()
 
-	client := NewMinerClient(conn)
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 	resp, err := client.Height(context.Background(), &HeightRequest{Token: token})
 	if err != nil {
 		return 0, err
@@ -348,14 +339,7 @@ func Getheight(srvAddr string, token []byte) (int64, error) {
 
 // GetFullChain downloads full blockchain from srvAddr node
 func (network *Network) GetFullChain(srvAddr string) error {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	client := NewMinerClient(conn)
-
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 	stream, err := client.GetFullChain(context.Background(), &GetFullChainRequest{})
 	if err != nil {
 		return err
@@ -380,13 +364,8 @@ func (network *Network) GetFullChain(srvAddr string) error {
 
 // GetChain gets chain from server/miner
 func (network *Network) GetChain(srvAddr string, token []byte) error {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 
-	client := NewMinerClient(conn)
+	client := NewMinerClient(ConnectedNodes[srvAddr])
 	stream, err := client.GetChain(context.Background(), &GetChainRequest{Token: token})
 	if err != nil {
 		return err
@@ -421,16 +400,8 @@ func (network *Network) GetChain(srvAddr string, token []byte) error {
 
 // PropagateBlock propagates a block accross the network
 func (network *Network) PropagateBlock(block []byte, srvAddr string) {
-	conn, err := grpc.DialContext(context.Background(), srvAddr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(time.Second*10)))
-	if err != nil {
-		logrus.Warnf("%v\n", err)
-		return
-	}
-	defer conn.Close()
-
-	client := NewMinerClient(conn)
-
-	_, err = client.PropagateBlock(context.Background(), &PropagateBlockRequest{Block: block})
+	client := NewMinerClient(ConnectedNodes[srvAddr])
+	_, err := client.PropagateBlock(context.Background(), &PropagateBlockRequest{Block: block})
 	if err != nil {
 		logrus.Warnf("%v\n", err)
 	}
@@ -511,7 +482,7 @@ func (network *Network) Ping(srvAddr string) bool {
 	return true
 }
 
-func contains(data map[string]struct{}, val string) bool {
+func contains(data map[string]*grpc.ClientConn, val string) bool {
 	if _, ok := data[val]; !ok {
 		return false
 	}
