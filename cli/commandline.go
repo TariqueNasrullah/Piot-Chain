@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TariqueNasrullah/iotchain/analysis"
 	"github.com/TariqueNasrullah/iotchain/blockchain"
 	"github.com/dgraph-io/badger"
 	"github.com/sirupsen/logrus"
@@ -85,6 +87,11 @@ func (cli *CommandLine) Run() {
 	testCmd := flag.NewFlagSet("test", flag.ExitOnError)
 	testCmdAddr := testCmd.String("f", "", "address")
 
+	analyzeCmd := flag.NewFlagSet("analyze", flag.ExitOnError)
+	analyzeCmdBlockCount := analyzeCmd.Int("count", 1, "Number of blocks to generate (positive integer)")
+	analyzeCmdBlockSise := analyzeCmd.Int("size", 1, "Block size in Kb (positive Integer)")
+	analyzeCmdServerAddr := analyzeCmd.String("f", "", "Server Address")
+
 	switch os.Args[1] {
 	case "node":
 		err := runNodeCmd.Parse(os.Args[2:])
@@ -123,6 +130,11 @@ func (cli *CommandLine) Run() {
 		}
 	case "test":
 		err := testCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "analyze":
+		err := analyzeCmd.Parse(os.Args[2:])
 		if err != nil {
 			log.Panic(err)
 		}
@@ -330,5 +342,42 @@ func (cli *CommandLine) Run() {
 	if testCmd.Parsed() {
 		network := blockchain.Network{}
 		network.Test(*testCmdAddr)
+	}
+	if analyzeCmd.Parsed() {
+		if *analyzeCmdBlockCount < 1 || *analyzeCmdBlockSise < 1 || len(*analyzeCmdServerAddr) == 0 {
+			analyzeCmd.Usage()
+			os.Exit(1)
+		}
+		analysis.BlockSize = *analyzeCmdBlockSise * 1000
+
+		key, err := blockchain.LoadKey(blockchain.KEYPATH)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		token := key.Token
+
+		chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		defer chain.Database.Close()
+		blockchain.Chain = chain
+		network := blockchain.Network{}
+
+		// generate fixed size transaction
+		randomByte := make([]byte, 1000)
+		rand.Read(randomByte)
+		var transactions []string
+		transactions = append(transactions, hex.EncodeToString(randomByte))
+		// end
+
+		for i := 1; i <= *analyzeCmdBlockCount; i++ {
+			logrus.Infof("Generting Block: %v\n", i)
+			err = network.CreateBlock(*clientCmdMinerAddr, token, transactions)
+			if err != nil {
+				logrus.Fatal(err)
+			}
+			logrus.Info("Block Mined Successfully")
+		}
 	}
 }

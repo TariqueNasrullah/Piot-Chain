@@ -201,8 +201,9 @@ func (block Block) String() string {
 	values = append(values, fmt.Sprintf(" Token     : %X", block.Token))
 	values = append(values, fmt.Sprintf(" PublicKey : %X", block.PublicKey))
 
-	for idx := range block.Transactions {
-		values = append(values, fmt.Sprintf("   ├──Transaction  : %s", string(block.Transactions[idx].Data)))
-	}
+	// for idx := range block.Transactions {
+	// 	values = append(values, fmt.Sprintf("   ├──Transaction  : %s", string(block.Transactions[idx].Data)))
+	// }
+	values = append(values, fmt.Sprintf(" Transactions(count): %v", len(block.Transactions)))
 	return strings.Join(values, "\n")
 }
