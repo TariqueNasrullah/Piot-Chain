@@ -373,7 +373,7 @@ func (cli *CommandLine) Run() {
 
 		for i := 1; i <= *analyzeCmdBlockCount; i++ {
 			logrus.Infof("Generting Block: %v\n", i)
-			err = network.CreateBlock(*clientCmdMinerAddr, token, transactions)
+			err = network.CreateBlock(*analyzeCmdServerAddr, token, transactions)
 			if err != nil {
 				logrus.Fatal(err)
 			}
