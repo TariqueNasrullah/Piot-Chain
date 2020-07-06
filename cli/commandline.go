@@ -365,7 +365,7 @@ func (cli *CommandLine) Run() {
 		network := blockchain.Network{}
 
 		// generate fixed size transaction
-		randomByte := make([]byte, 1000)
+		randomByte := make([]byte, analysis.BlockSize)
 		rand.Read(randomByte)
 		var transactions []string
 		transactions = append(transactions, hex.EncodeToString(randomByte))
