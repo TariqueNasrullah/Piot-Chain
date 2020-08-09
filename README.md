@@ -3,7 +3,7 @@
 ## Spining Up Miner Node
 Stand Alone
 
-    go run main.go node _node_addr:port
+    go run main.go node -addr _node_addr:port
 
 Example
 
