@@ -13,6 +13,10 @@ const (
 	blockGenerationTimePath = "data/gen_time/"
 )
 
+var (
+	BlockSize int
+)
+
 // SaveBlockGenTime saves block generation time
 func SaveBlockGenTime(start, end time.Time, indentity []byte) {
 	f, err := os.Create(blockGenerationTimePath + hex.EncodeToString(indentity))
