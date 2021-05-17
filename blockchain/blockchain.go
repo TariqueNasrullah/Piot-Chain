@@ -3,6 +3,7 @@ package blockchain
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/net/context"
 	"os"
 	"time"
 
@@ -18,12 +19,7 @@ var (
 // BlockChain structure
 type BlockChain struct {
 	Database *badger.DB
-}
-
-//Iterator structure
-type Iterator struct {
-	CurrentHash []byte
-	Database    *badger.DB
+	repo     Repository
 }
 
 var (
@@ -32,7 +28,7 @@ var (
 )
 
 // InitBlockChain initiates blockchain
-func InitBlockChain(dbPath string) (*BlockChain, error) {
+func InitBlockChain(dbPath string, repo Repository) (*BlockChain, error) {
 	opts := badger.DefaultOptions(dbPath)
 	opts.Logger = nil
 
@@ -41,7 +37,9 @@ func InitBlockChain(dbPath string) (*BlockChain, error) {
 		return nil, err
 	}
 
-	chain := BlockChain{Database: db}
+	r := NewBadgerRepository(db)
+
+	chain := BlockChain{Database: db, repo: r}
 
 	return &chain, nil
 }
@@ -147,171 +145,64 @@ func (chain *BlockChain) AddGenesis(genesis *Block) error {
 		}
 	}
 
-	for {
-		err := chain.Database.Update(func(txn *badger.Txn) error {
-			address, err := Address(genesis.Token)
-			if err != nil {
-				return err
-			}
-
-			_, err = txn.Get(address)
-			if err == nil {
-				return &ChainError{
-					StatusCode: ErrorGenesisExists,
-					Err:        errors.New("Genesis block exists"),
-				}
-			}
-
-			data, err := genesis.Serialize()
-			if err != nil {
-				return err
-			}
-
-			err = txn.Set(genesis.Hash, data)
-			if err != nil {
-				return err
-			}
-
-			err = txn.Set(address, genesis.Hash)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		})
-
-		if err == badger.ErrConflict {
-			time.Sleep(time.Duration(time.Millisecond * 500))
-			continue
-		}
-
-		if err != nil {
-			return &ChainError{
-				StatusCode: ErrorUnknown,
-				Err:        fmt.Errorf("Error: %v", err),
-			}
-		}
-		break
+	address, err := Address(genesis.Token)
+	if err != nil {
+		return err
 	}
+
+	_, err = chain.repo.GetTail(context.Background(), string(address))
+	if err == nil {
+		return &ChainError{
+			StatusCode: ErrorGenesisExists,
+			Err:        errors.New("Genesis block exists"),
+		}
+	}
+
+	err = chain.repo.Store(context.Background(), string(address), genesis)
+
+	if err != nil {
+		return &ChainError{
+			StatusCode: ErrorUnknown,
+			Err:        fmt.Errorf("Error: %v", err),
+		}
+	}
+
 	return nil
 }
 
 // FullHeight returns blockchain height
 func (chain *BlockChain) FullHeight() int64 {
-	height := int64(0)
-
-	chain.Database.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		for it.Rewind(); it.Valid(); it.Next() {
-			height++
-		}
-		return nil
-	})
+	height, _ := chain.repo.CollectionCount(context.Background())
 	return height
 }
 
 // Height retunrs height of a chain
 func (chain *BlockChain) Height(token []byte) (int64, error) {
-	height := int64(0)
 	addr, err := Address(token)
 	if err != nil {
 		return 0, err
 	}
 
-	keyfound := true
-	var lastHash []byte
-
-	err = chain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(addr)
-		if err == badger.ErrKeyNotFound {
-			keyfound = false
-			return nil
-		}
-		err = item.Value(func(val []byte) error {
-			lastHash = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	blockList, err := chain.repo.Fetch(context.Background(), string(addr))
 	if err != nil {
 		return 0, err
 	}
-	if keyfound == false {
-		return 0, nil
-	}
 
-	itr := Iterator{CurrentHash: lastHash, Database: chain.Database}
-
-	for {
-		block := itr.Next()
-		if block == nil {
-			break
-		}
-
-		height++
-
-		if len(block.PrevHash) == 0 {
-			break
-		}
-	}
-	return height, nil
+	return int64(len(blockList)), nil
 }
 
 // Chain retunrs chain of a token
 func (chain *BlockChain) Chain(token []byte) ([]*Block, error) {
-	blockList := []*Block{}
 	addr, err := Address(token)
 	if err != nil {
-		return blockList, err
+		return nil, err
 	}
 
-	keyfound := true
-	var lastHash []byte
-
-	err = chain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(addr)
-		if err == badger.ErrKeyNotFound {
-			keyfound = false
-			return nil
-		}
-		err = item.Value(func(val []byte) error {
-			lastHash = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	blockList, err := chain.repo.Fetch(context.Background(), string(addr))
 	if err != nil {
-		return blockList, err
-	}
-	if keyfound == false {
-		return blockList, nil
+		return nil, err
 	}
 
-	itr := Iterator{CurrentHash: lastHash, Database: chain.Database}
-
-	for {
-		block := itr.Next()
-		if block == nil {
-			break
-		}
-
-		blockList = append(blockList, block)
-
-		if len(block.PrevHash) == 0 {
-			break
-		}
-	}
 	return blockList, nil
 }
 
@@ -321,25 +212,8 @@ func (chain *BlockChain) LastHash(token []byte) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
-	var lastHash []byte
-	err = chain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(addr)
-		if err == badger.ErrKeyNotFound {
-			return errors.New("Last Hash not found, you need to sync your localchain from a miner")
-		}
-		err = item.Value(func(val []byte) error {
-			lastHash = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return []byte{}, err
-	}
-	return lastHash, nil
+
+	return chain.repo.GetTail(context.Background(), string(addr))
 }
 
 // ClearDB clear Blockchain Database
@@ -349,35 +223,4 @@ func ClearDB() error {
 		return err
 	}
 	return nil
-}
-
-// Next returns next block
-func (itr *Iterator) Next() *Block {
-	var block *Block
-
-	err := itr.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(itr.CurrentHash)
-		if err != nil {
-			return err
-		}
-		var encodedBlock []byte
-		err = item.Value(func(val []byte) error {
-			encodedBlock = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		block, err = Deserialize(encodedBlock)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil
-	}
-	itr.CurrentHash = block.PrevHash
-	return block
 }

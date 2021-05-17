@@ -199,7 +199,7 @@ func TestAddBlock(t *testing.T) {
 	block.Nonce = nonce
 	block.Hash = hash
 
-	chain, err := InitBlockChain("tmp")
+	chain, err := InitBlockChain("tmp", nil)
 	if err != nil {
 		t.Fatal("Init chain Error is unexpected ", err)
 	}

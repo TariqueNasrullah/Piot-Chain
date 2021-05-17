@@ -55,6 +55,15 @@ func (cli *CommandLine) validateArgs() {
 
 // Run runs commandline
 func (cli *CommandLine) Run() {
+	opts := badger.DefaultOptions(blockchain.DBPATH)
+	opts.Logger = nil
+
+	db, err := badger.Open(opts)
+	if err != nil {
+		panic(err)
+	}
+	badgerRepo := blockchain.NewBadgerRepository(db)
+
 	cli.validateArgs()
 
 	runNodeCmd := flag.NewFlagSet("node", flag.ExitOnError)
@@ -147,7 +156,7 @@ func (cli *CommandLine) Run() {
 		blockchain.NodeAddress = *nodeAddress
 		network := blockchain.Network{}
 
-		chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+		chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 		if err != nil {
 			logrus.Fatalf("Can't Initialize blockchain database %v\n", err)
 		}
@@ -199,7 +208,7 @@ func (cli *CommandLine) Run() {
 		logrus.Info("Database Cleaned Up")
 	}
 	if populateCmd.Parsed() {
-		chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+		chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 		if err != nil {
 			logrus.Fatalf("Can't Initialize blockchain database %v\n", err)
 		}
@@ -262,7 +271,7 @@ func (cli *CommandLine) Run() {
 			token = tkn
 		}
 
-		chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+		chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 		if err != nil {
 			logrus.Fatalf("Can't Initialize blockchain database %v\n", err)
 		}
@@ -270,7 +279,7 @@ func (cli *CommandLine) Run() {
 		defer chain.Database.Close()
 
 		network := blockchain.Network{}
-		err = network.Printchain(token)
+		err = network.PrintChain(token)
 		if err != nil {
 			if err == badger.ErrKeyNotFound {
 				log.Fatal("Token is invalid")
@@ -304,7 +313,7 @@ func (cli *CommandLine) Run() {
 		}
 
 		if *clientCmdSync == true {
-			chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+			chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 			if err != nil {
 				logrus.Fatal(err)
 			}
@@ -321,7 +330,7 @@ func (cli *CommandLine) Run() {
 				clientCmd.Usage()
 				logrus.Fatal("No transaction data provided")
 			}
-			chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+			chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 			if err != nil {
 				logrus.Fatal(err)
 			}
@@ -356,7 +365,7 @@ func (cli *CommandLine) Run() {
 		}
 		token := key.Token
 
-		chain, err := blockchain.InitBlockChain(blockchain.DBPATH)
+		chain, err := blockchain.InitBlockChain(blockchain.DBPATH, badgerRepo)
 		if err != nil {
 			logrus.Fatal(err)
 		}

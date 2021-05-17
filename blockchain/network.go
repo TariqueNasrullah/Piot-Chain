@@ -432,44 +432,15 @@ func (network *Network) GetToken(username, password, srvAddr string) ([]byte, er
 	return resp.Token, nil
 }
 
-// Printchain prints the chain of an address
-func (network *Network) Printchain(token []byte) error {
-	address, err := Address(token)
-	if err != nil {
-		return err
-	}
-	var lastHash []byte
-	err = Chain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(address)
-		if err != nil {
-			return err
-		}
-		err = item.Value(func(val []byte) error {
-			lastHash = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+// PrintChain prints the chain of an address
+func (network *Network) PrintChain(token []byte) error {
+	blockList, err := Chain.Chain(token)
 	if err != nil {
 		return err
 	}
 
-	itr := Iterator{CurrentHash: lastHash, Database: Chain.Database}
-
-	for {
-		block := itr.Next()
-		if block == nil {
-			break
-		}
-
+	for _, block := range blockList {
 		fmt.Printf("%s\n", block)
-
-		if len(block.PrevHash) == 0 {
-			break
-		}
 	}
 	return nil
 }
